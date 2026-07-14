@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.chirstius</groupId>
+  <artifactId>dataweave-slack-blockkit</artifactId>
+  <version>1.0.0</version>
+  <packaging>dw-library</packaging>
+
+  <name>DataWeave Slack Block Kit</name>
+  <description>A DataWeave library of builder functions and types for composing Slack Block Kit
+    primitives, layout blocks, interactive elements, rich text, surfaces and modern agentic
+    blocks — for use in MuleSoft (Mule 4) applications.</description>
+  <url>https://github.com/chirstius/dataweave-slack-blockkit</url>
+  <inceptionYear>2026</inceptionYear>
+
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>chirstius</id>
+      <name>Chuck Hirstius</name>
+      <url>https://github.com/chirstius</url>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/chirstius/dataweave-slack-blockkit.git</connection>
+    <developerConnection>scm:git:git@github.com:chirstius/dataweave-slack-blockkit.git</developerConnection>
+    <url>https://github.com/chirstius/dataweave-slack-blockkit</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- DataWeave build toolchain. These pin the compiler/plugin used to package and TEST the
+         library at build time; they do NOT constrain the Mule runtime that consumes it. The
+         emitted artifact is just `.dwl` text under slack/, so it is runtime-version agnostic and
+         works on any Mule 4.x app that imports it. Bump if you want to build/test against a newer
+         DataWeave. -->
+    <data.weave.version>2.4.0-20220321</data.weave.version>
+    <data.weave.maven.plugin.version>0.2.0</data.weave.maven.plugin.version>
+    <data.weave.testing.framework.version>1.1.1</data.weave.testing.framework.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.mule.weave</groupId>
+      <artifactId>runtime</artifactId>
+      <version>${data.weave.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mule.weave</groupId>
+      <artifactId>core-modules</artifactId>
+      <version>${data.weave.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mule.weave</groupId>
+      <artifactId>java-module</artifactId>
+      <version>${data.weave.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mule.weave</groupId>
+      <artifactId>data-weave-testing-framework</artifactId>
+      <version>${data.weave.testing.framework.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <repositories>
+    <repository>
+      <id>mule-releases</id>
+      <url>https://repository-master.mulesoft.org/nexus/content/repositories/releases</url>
+    </repository>
+    <repository>
+      <id>mule-snapshots</id>
+      <url>https://repository-master.mulesoft.org/nexus/content/repositories/snapshots</url>
+    </repository>
+  </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>mule-releases</id>
+      <url>https://repository-master.mulesoft.org/nexus/content/repositories/releases</url>
+    </pluginRepository>
+    <pluginRepository>
+      <id>mule-snapshots</id>
+      <url>https://repository-master.mulesoft.org/nexus/content/repositories/snapshots</url>
+    </pluginRepository>
+  </pluginRepositories>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/dw</directory>
+      </resource>
+    </resources>
+    <testResources>
+      <testResource>
+        <directory>src/test/dw</directory>
+      </testResource>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+    </testResources>
+    <plugins>
+      <plugin>
+        <groupId>org.mule.weave</groupId>
+        <artifactId>data-weave-maven-plugin</artifactId>
+        <version>${data.weave.maven.plugin.version}</version>
+        <extensions>true</extensions>
+        <configuration>
+          <tests>
+            <coverageEnabled>true</coverageEnabled>
+            <coverageFormat>sonar</coverageFormat>
+          </tests>
+          <docs>
+            <homePage>${project.basedir}/README.md</homePage>
+          </docs>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!--
+    ===========================================================================================
+    PUBLISHING
+    ===========================================================================================
+    The `release` profile wires up publishing to Maven Central via the Sonatype Central Portal
+    (io.github.chirstius namespace, verified through GitHub). Central is credential-free and
+    zero-extra-config for CONSUMERS (it is a default Maven repository), immutable, and independent
+    of any Anypoint organization. Activate with:  mvn -Prelease deploy
+    Requires a Central Portal token (settings.xml server id `central`) and a GPG key for signing.
+  -->
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.7</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.7.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

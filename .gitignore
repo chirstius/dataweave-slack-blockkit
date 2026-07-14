@@ -1,0 +1,12 @@
+target/
+.mule/
+*.iml
+.idea/
+.project
+.classpath
+.settings/
+.factorypath
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini

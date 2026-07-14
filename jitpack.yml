@@ -1,0 +1,7 @@
+# JitPack build config. JitPack builds this repo on demand from any git tag/commit and serves
+# it as a Maven artifact with no credentials required by consumers — the low-ceremony
+# distribution path (see README "Installation"). Pinned to JDK 17 to match the build.
+jdk:
+  - openjdk17
+install:
+  - mvn install -DskipTests -B -ntp

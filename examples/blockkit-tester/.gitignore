@@ -1,0 +1,8 @@
+target/
+.mule/
+*.iml
+.idea/
+.project
+.classpath
+.settings/
+desktop.ini

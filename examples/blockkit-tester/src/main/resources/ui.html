@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slack Block Kit Tester</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0;
+         background: #f6f7f9; color: #1d1c1d; }
+  @media (prefers-color-scheme: dark) { body { background: #1a1d21; color: #e8e8e8; } .card,.result{background:#222529!important;border-color:#3a3d42!important;} input,select{background:#1a1d21!important;color:#e8e8e8!important;border-color:#3a3d42!important;} th{background:#2b2e33!important;} }
+  header { background: #4a154b; color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  main { max-width: 980px; margin: 20px auto; padding: 0 16px; }
+  .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+  input, select { width: 100%; padding: 9px 11px; border: 1px solid #ccc; border-radius: 7px; font-size: 14px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 180px; }
+  .hint { font-size: 12px; opacity: .6; margin-top: 4px; }
+  button { cursor: pointer; border: none; border-radius: 7px; padding: 9px 15px; font-size: 14px; font-weight: 600; margin: 4px 6px 4px 0; }
+  .primary { background: #007a5a; color: #fff; }
+  .secondary { background: #e8e8e8; color: #1d1c1d; }
+  .danger { background: #e01e5a; color: #fff; }
+  @media (prefers-color-scheme: dark) { .secondary { background: #3a3d42; color: #e8e8e8; } }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+  .ok { background: #e7f5ef; color: #007a5a; } .err { background: #fdecef; color: #e01e5a; } .neutral { background:#eee; color:#555; }
+  .result { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 0; margin-bottom: 18px; overflow: hidden; }
+  .result .bar { padding: 12px 16px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  pre { margin: 0; padding: 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; max-height: 460px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; }
+  th { background: #f0f0f0; }
+  .muted { opacity: .6; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Slack Block Kit Tester</h1>
+  <p>Renders the <code>dataweave-slack-blockkit</code> builders and posts them to the real Slack Web API.</p>
+</header>
+<main>
+
+  <div class="card">
+    <h2>Credentials</h2>
+    <label for="token">Slack token (bot or user)</label>
+    <input id="token" type="password" placeholder="xoxb-... (sent to this local app only, never stored)" autocomplete="off">
+    <div class="hint">The token is used only to make the request from this app to Slack. It is not saved anywhere.</div>
+    <div class="row">
+      <div>
+        <label for="channel">Channel ID (for sends)</label>
+        <input id="channel" type="text" placeholder="C0123456789">
+        <div class="hint">Your bot must be a member of this channel.</div>
+      </div>
+      <div>
+        <label for="user">User ID (for Publish Home)</label>
+        <input id="user" type="text" placeholder="U0123456789">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Run a sample</h2>
+    <label for="sample">Sample</label>
+    <select id="sample"></select>
+    <div style="margin-top:14px">
+      <button class="secondary" onclick="preview()">Preview JSON (no token)</button>
+      <button class="primary" onclick="sendOne()">Send to Slack</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Run everything</h2>
+    <button class="primary" onclick="sendAll()">Send all message samples</button>
+    <button class="secondary" onclick="publishHome()">Publish App Home</button>
+    <div class="hint">Send all posts every message sample to the channel and reports a pass/fail summary.</div>
+  </div>
+
+  <div id="resultWrap"></div>
+
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  async function loadSamples() {
+    if (!location.protocol.startsWith('http')) {
+      showError("Open this page from the running app at http://localhost:8081/ — " +
+                "not the file preview. Relative requests need the app's HTTP origin.");
+      return;
+    }
+    try {
+      const r = await fetch('samples');
+      const d = await r.json();
+      const sel = $('sample');
+      sel.innerHTML = '';
+      (d.messageSamples || []).forEach(k => {
+        const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o);
+      });
+    } catch (e) { showError('Could not load samples: ' + e); }
+  }
+
+  function authHeaders() {
+    const t = $('token').value.trim();
+    const h = {};
+    if (t) h['Authorization'] = t.startsWith('Bearer ') ? t : ('Bearer ' + t);
+    return h;
+  }
+
+  function needToken() {
+    if (!$('token').value.trim()) { showError('Enter a Slack token first.'); return false; }
+    return true;
+  }
+
+  function render(title, data, okFlag) {
+    const wrap = $('resultWrap');
+    let badge = '<span class="badge neutral">dry run</span>';
+    if (okFlag === true) badge = '<span class="badge ok">valid &#10003;</span>';
+    else if (okFlag === false) badge = '<span class="badge err">rejected &#10007;</span>';
+
+    let summaryTable = '';
+    if (data && Array.isArray(data.results)) {
+      const rows = data.results.map(x =>
+        `<tr><td>${x.sample}</td><td>${x.valid ? '<span class="badge ok">ok</span>' : '<span class="badge err">'+(x.slackError||'fail')+'</span>'}</td></tr>`).join('');
+      summaryTable = `<table><tr><th>Sample</th><th>Result</th></tr>${rows}</table>
+        <p class="muted" style="padding:0 16px">Passed ${data.passed} / ${data.total}</p>`;
+    }
+
+    wrap.innerHTML = `<div class="result">
+        <div class="bar"><strong>${title}</strong> ${badge}
+          ${data && data.slackError ? '<span class="muted">error: '+data.slackError+'</span>' : ''}</div>
+        ${summaryTable}
+        <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+      </div>` + wrap.innerHTML;
+  }
+
+  function showError(msg) {
+    $('resultWrap').innerHTML = `<div class="result"><div class="bar"><span class="badge err">error</span> ${escapeHtml(msg)}</div></div>` + $('resultWrap').innerHTML;
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+  async function preview() {
+    const key = $('sample').value;
+    const r = await fetch('samples/' + encodeURIComponent(key));
+    render('Preview: ' + key + ' (dry run)', await r.json(), null);
+  }
+
+  async function sendOne() {
+    if (!needToken()) return;
+    const key = $('sample').value;
+    const ch = encodeURIComponent($('channel').value.trim());
+    const r = await fetch('send/' + encodeURIComponent(key) + '?channel=' + ch, { method: 'POST', headers: authHeaders() });
+    const d = await r.json();
+    render('Send: ' + key, d, d.valid);
+  }
+
+  async function sendAll() {
+    if (!needToken()) return;
+    const ch = encodeURIComponent($('channel').value.trim());
+    const r = await fetch('send-all?channel=' + ch, { method: 'POST', headers: authHeaders() });
+    const d = await r.json();
+    render('Send all', d, d.failed === 0);
+  }
+
+  async function publishHome() {
+    if (!needToken()) return;
+    const u = encodeURIComponent($('user').value.trim());
+    const r = await fetch('home?user=' + u, { method: 'POST', headers: authHeaders() });
+    const d = await r.json();
+    render('Publish App Home', d, d.valid);
+  }
+
+  loadSamples();
+</script>
+</body>
+</html>

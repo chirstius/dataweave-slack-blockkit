@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <configuration-properties file="application.yaml"/>
+
+    <http:listener-config name="httpListener">
+        <http:listener-connection host="0.0.0.0" port="${http.port}"/>
+    </http:listener-config>
+
+    <!-- Outbound connection to the Slack Web API -->
+    <http:request-config name="slackApi">
+        <http:request-connection protocol="HTTPS" host="slack.com" port="443"/>
+    </http:request-config>
+
+    <!-- =====================================================================================
+         UI: a simple web control panel served at /
+         ===================================================================================== -->
+
+    <flow name="serve-ui">
+        <http:listener config-ref="httpListener" path="/" allowedMethods="GET"/>
+        <set-payload value='#[readUrl("classpath://ui.html", "text/plain")]' mimeType="text/html" encoding="UTF-8"/>
+    </flow>
+
+    <!-- =====================================================================================
+         DRY RUN: render sample payloads without touching Slack. No token needed.
+         ===================================================================================== -->
+
+    <flow name="list-samples">
+        <http:listener config-ref="httpListener" path="/samples" allowedMethods="GET"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+import * from dw::samples
+output application/json
+---
+{
+    messageSamples: keysOf(messages),
+    surfaceSamples: [ "home" ],
+    usage: {
+        dryRunOne: "GET /samples/{key}",
+        send: "POST /send/{key}?channel=CXXTHECHANNEL  (header: Authorization: Bearer xoxb-...)",
+        sendAll: "POST /send-all?channel=CXXTHECHANNEL  (header: Authorization: Bearer xoxb-...)",
+        publishHome: "POST /home?user=UXXTHEUSER       (header: Authorization: Bearer xoxb-...)"
+    },
+    payloads: messages
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <flow name="get-sample">
+        <http:listener config-ref="httpListener" path="/samples/{key}" allowedMethods="GET"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+import * from dw::samples
+output application/json
+---
+{ channel: "REPLACE_WITH_CHANNEL", blocks: messages[attributes.uriParams.key] default null }]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- =====================================================================================
+         SEND: post a sample to Slack and report Slack's validation verdict.
+         Token is supplied per-request via the Authorization header; it is never stored.
+         ===================================================================================== -->
+
+    <flow name="send-one">
+        <http:listener config-ref="httpListener" path="/send/{key}" allowedMethods="POST"/>
+        <set-variable variableName="sampleKey" value="#[attributes.uriParams.key]"/>
+        <set-variable variableName="slackChannel" value="#[attributes.queryParams.channel default '']"/>
+        <set-variable variableName="slackAuth" value="#[attributes.headers['authorization'] default attributes.headers['Authorization'] default '']"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+import * from dw::samples
+output application/json
+---
+{ channel: vars.slackChannel, blocks: messages[vars.sampleKey] default [] }]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <set-variable variableName="requestBody" value="#[payload]"/>
+        <http:request method="POST" config-ref="slackApi" path="/api/chat.postMessage">
+            <http:body>#[payload]</http:body>
+            <http:headers>#[{ "Authorization": vars.slackAuth, "Content-Type": "application/json; charset=utf-8" }]</http:headers>
+            <http:response-validator>
+                <http:success-status-code-validator values="200..599"/>
+            </http:response-validator>
+        </http:request>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    sample: vars.sampleKey,
+    channel: vars.slackChannel,
+    valid: payload.ok default false,
+    slackError: payload.error default null,
+    blockErrors: payload.response_metadata.messages default [],
+    ts: payload.ts default null,
+    request: vars.requestBody,
+    slackResponse: payload
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <flow name="send-all">
+        <http:listener config-ref="httpListener" path="/send-all" allowedMethods="POST"/>
+        <set-variable variableName="slackChannel" value="#[attributes.queryParams.channel default '']"/>
+        <set-variable variableName="slackAuth" value="#[attributes.headers['authorization'] default attributes.headers['Authorization'] default '']"/>
+        <set-variable variableName="results" value="#[output application/java --- []]"/>
+        <ee:transform>
+            <ee:variables>
+                <ee:set-variable variableName="keys"><![CDATA[%dw 2.0
+import * from dw::samples
+output application/java
+---
+keysOf(messages) map ((k) -> k as String)]]></ee:set-variable>
+            </ee:variables>
+        </ee:transform>
+        <foreach collection="#[vars.keys]">
+            <set-variable variableName="curKey" value="#[payload]"/>
+            <ee:transform>
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+import * from dw::samples
+output application/json
+---
+{ channel: vars.slackChannel, blocks: messages[vars.curKey] default [] }]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+            <http:request method="POST" config-ref="slackApi" path="/api/chat.postMessage">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[{ "Authorization": vars.slackAuth, "Content-Type": "application/json; charset=utf-8" }]</http:headers>
+                <http:response-validator>
+                    <http:success-status-code-validator values="200..599"/>
+                </http:response-validator>
+            </http:request>
+            <set-variable variableName="results" value="#[output application/java --- vars.results + [{ sample: vars.curKey, valid: payload.ok default false, slackError: payload.error default null, blockErrors: payload.response_metadata.messages default [] }]]"/>
+        </foreach>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    channel: vars.slackChannel,
+    total: sizeOf(vars.results),
+    passed: sizeOf(vars.results filter ((r) -> r.valid == true)),
+    failed: sizeOf(vars.results filter ((r) -> r.valid != true)),
+    results: vars.results
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- =====================================================================================
+         PUBLISH APP HOME: validates the views.publish path (input blocks, home surface).
+         ===================================================================================== -->
+
+    <flow name="publish-home">
+        <http:listener config-ref="httpListener" path="/home" allowedMethods="POST"/>
+        <set-variable variableName="userId" value="#[attributes.queryParams.user default '']"/>
+        <set-variable variableName="slackAuth" value="#[attributes.headers['authorization'] default attributes.headers['Authorization'] default '']"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+import * from dw::samples
+import publishHomeView from slack::Views
+output application/json
+---
+publishHomeView(vars.userId, homeBlocks)]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <set-variable variableName="requestBody" value="#[payload]"/>
+        <http:request method="POST" config-ref="slackApi" path="/api/views.publish">
+            <http:body>#[payload]</http:body>
+            <http:headers>#[{ "Authorization": vars.slackAuth, "Content-Type": "application/json; charset=utf-8" }]</http:headers>
+            <http:response-validator>
+                <http:success-status-code-validator values="200..599"/>
+            </http:response-validator>
+        </http:request>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    surface: "home",
+    user: vars.userId,
+    valid: payload.ok default false,
+    slackError: payload.error default null,
+    blockErrors: payload.response_metadata.messages default [],
+    request: vars.requestBody,
+    slackResponse: payload
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+</mule>

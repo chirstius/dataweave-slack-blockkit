@@ -1,0 +1,8 @@
+{
+  "minMuleVersion": "4.6.0",
+  "name": "blockkit-tester",
+  "requiredProduct": "MULE_EE",
+  "configs": [
+    "blockkit-tester.xml"
+  ]
+}

@@ -1,0 +1,41 @@
+name: Release to Maven Central
+
+# Publishes the library to Maven Central (Sonatype Central Portal) when a GitHub Release is
+# published. Requires the repository secrets documented in RELEASING.md:
+#   CENTRAL_TOKEN_USERNAME / CENTRAL_TOKEN_PASSWORD  (Central Portal user token)
+#   GPG_PRIVATE_KEY / GPG_PASSPHRASE                  (armored signing key + its passphrase)
+#
+# The pom's `release` profile does the GPG signing and the Central upload. `autoPublish` is
+# false in the pom, so the release lands as a staged deployment in the Central Portal for you
+# to review and release (set autoPublish=true in the pom to publish automatically).
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Sign & publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 + Central credentials + GPG
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Deploy to Central
+        run: mvn -B -ntp -Prelease clean deploy
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
