@@ -150,6 +150,44 @@
       <id>release</id>
       <build>
         <plugins>
+          <!-- Maven Central requires -sources and -javadoc jars. A dw-library has no Java
+               sources/javadoc, so we attach the DataWeave sources (the .dwl files) as the
+               sources jar and the generated DataWeave API docs as the javadoc jar. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>3.4.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <classifier>sources</classifier>
+                  <classesDirectory>${project.basedir}/src/main/dw</classesDirectory>
+                  <excludes>
+                    <exclude>**/desktop.ini</exclude>
+                  </excludes>
+                </configuration>
+              </execution>
+              <execution>
+                <id>attach-javadoc</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <classifier>javadoc</classifier>
+                  <classesDirectory>${project.build.directory}/data-weave-docs</classesDirectory>
+                  <excludes>
+                    <exclude>**/desktop.ini</exclude>
+                  </excludes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
