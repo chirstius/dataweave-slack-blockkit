@@ -260,7 +260,11 @@
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
-              <autoPublish>false</autoPublish>
+              <!-- Publish automatically once Central validates the upload (no manual click in
+                   the Portal). waitUntil=published makes the build block until it goes live so a
+                   validation failure fails the release workflow. -->
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
             </configuration>
           </plugin>
         </plugins>

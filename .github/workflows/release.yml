@@ -6,8 +6,8 @@ name: Release to Maven Central
 #   GPG_PRIVATE_KEY / GPG_PASSPHRASE                  (armored signing key + its passphrase)
 #
 # The pom's `release` profile does the GPG signing and the Central upload. `autoPublish` is
-# false in the pom, so the release lands as a staged deployment in the Central Portal for you
-# to review and release (set autoPublish=true in the pom to publish automatically).
+# true in the pom, so once Central validates the upload it publishes automatically (no manual
+# click); `waitUntil=published` makes this job block until it is live.
 
 on:
   release:

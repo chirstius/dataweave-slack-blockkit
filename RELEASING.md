@@ -70,9 +70,10 @@ In the GitHub repo: **Settings -> Secrets and variables -> Actions -> New reposi
 2. Create a **GitHub Release** with a tag like `v1.0.1` (or run the *Release to Maven Central*
    workflow manually via **workflow_dispatch**).
 3. The `release` workflow signs the artifacts and uploads them to the Central Portal.
-4. Because `autoPublish` is `false` in the pom's `release` profile, the deployment lands as a
-   **staged** deployment in the Central Portal — review it there and click **Publish**. (Set
-   `autoPublish` to `true` in the pom to skip the manual step once you trust the pipeline.)
+4. `autoPublish` is `true` in the pom's `release` profile, so once Central validates the upload it
+   publishes automatically — no manual click. `waitUntil=published` makes the workflow block until
+   it goes live, so a validation failure fails the workflow. (Set `autoPublish` to `false` to go
+   back to staged deployments you publish by hand in the Portal.)
 5. After Central processes it (usually minutes), the artifact is live at
    `https://repo1.maven.org/maven2/io/github/chirstius/dataweave-slack-blockkit/`.
 
