@@ -150,6 +150,44 @@
       <id>release</id>
       <build>
         <plugins>
+          <!-- The dw-library packaging binds several Anypoint Exchange deploy goals to the
+               `deploy` phase (both from exchange-mule-maven-plugin and the DataWeave plugin
+               itself). We publish to Maven Central instead, so unbind all of them (phase none)
+               and let the central-publishing plugin handle deploy. -->
+          <plugin>
+            <groupId>org.mule.tools.maven</groupId>
+            <artifactId>exchange-mule-maven-plugin</artifactId>
+            <version>0.0.16</version>
+            <executions>
+              <execution>
+                <id>default-exchange-pre-deploy</id>
+                <phase>none</phase>
+              </execution>
+              <execution>
+                <id>default-exchange-deploy</id>
+                <phase>none</phase>
+              </execution>
+              <execution>
+                <id>default-exchange-post-deploy</id>
+                <phase>none</phase>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.mule.weave</groupId>
+            <artifactId>data-weave-maven-plugin</artifactId>
+            <version>${data.weave.maven.plugin.version}</version>
+            <executions>
+              <execution>
+                <id>default-deploy-docs</id>
+                <phase>none</phase>
+              </execution>
+              <execution>
+                <id>default-deploy</id>
+                <phase>none</phase>
+              </execution>
+            </executions>
+          </plugin>
           <!-- Maven Central requires -sources and -javadoc jars. A dw-library has no Java
                sources/javadoc, so we attach the DataWeave sources (the .dwl files) as the
                sources jar and the generated DataWeave API docs as the javadoc jar. -->
