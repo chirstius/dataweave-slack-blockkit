@@ -63,6 +63,53 @@ Add the dependency (published to Maven Central — a default Maven repository, s
 Copy the files under [`src/main/dw/slack`](src/main/dw/slack) into your app's
 `src/main/resources/dw/slack/` directory. The `slack::*` imports resolve the same way.
 
+## Using it in a Mule application
+
+Add the dependency to your Mule app's `pom.xml`, alongside your connectors. It's an ordinary
+compile-scope dependency — the `mule-maven-plugin` bundles it into the application, and the
+DataWeave compiler resolves the `slack::*` modules from the classpath. No `<repository>` block is
+needed (Maven Central is a default repository):
+
+```xml
+<dependencies>
+  <!-- ...your connectors (HTTP, Slack, etc.)... -->
+  <dependency>
+    <groupId>io.github.chirstius</groupId>
+    <artifactId>dataweave-slack-blockkit</artifactId>
+    <version>1.0.0</version>
+  </dependency>
+</dependencies>
+```
+
+Then `import` the modules from any DataWeave script — inline in a flow or from a `.dwl` under
+`src/main/resources`. For example, build a message and post it with the HTTP connector:
+
+```xml
+<ee:transform doc:name="Build Slack message">
+  <ee:message>
+    <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from slack::Builders
+import * from slack::Views
+---
+message([
+  header("Deployment complete :rocket:"),
+  section("*$(vars.appName)* is live in *$(vars.env)*")
+]) withChannel vars.channel]]></ee:set-payload>
+  </ee:message>
+</ee:transform>
+
+<http:request method="POST" url="https://slack.com/api/chat.postMessage" config-ref="Slack_API">
+  <http:headers><![CDATA[#[{
+    "Authorization": "Bearer " ++ p('slack.token'),
+    "Content-Type": "application/json"
+  }]]]></http:headers>
+</http:request>
+```
+
+For a complete, runnable Mule app that renders every builder and posts to the live Slack API, see
+[`examples/blockkit-tester`](examples/blockkit-tester).
+
 ## Quick start
 
 ```dataweave
