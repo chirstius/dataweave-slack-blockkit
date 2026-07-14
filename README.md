@@ -34,9 +34,12 @@ Add the dependency (published to Maven Central — a default Maven repository, s
   <groupId>io.github.chirstius</groupId>
   <artifactId>dataweave-slack-blockkit</artifactId>
   <version>1.0.0</version>
-  <classifier>dw-library</classifier>
 </dependency>
 ```
+
+> A `-dw-library`-classified jar with identical content is also published, if you prefer the
+> MuleSoft convention — add `<classifier>dw-library</classifier>`. Both resolve the same
+> `slack::*` modules.
 
 ### 2. JitPack (build straight from a GitHub tag)
 
@@ -51,8 +54,7 @@ Add the dependency (published to Maven Central — a default Maven repository, s
 <dependency>
   <groupId>com.github.chirstius</groupId>
   <artifactId>dataweave-slack-blockkit</artifactId>
-  <version>1.0.0</version>
-  <classifier>dw-library</classifier>
+  <version>v1.0.0</version>
 </dependency>
 ```
 

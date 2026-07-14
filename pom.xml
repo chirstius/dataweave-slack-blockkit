@@ -7,7 +7,12 @@
   <groupId>io.github.chirstius</groupId>
   <artifactId>dataweave-slack-blockkit</artifactId>
   <version>1.0.0</version>
-  <packaging>dw-library</packaging>
+  <!-- Plain `jar` packaging (not `dw-library`) so the primary artifact is the un-classified
+       `artifactId-version.jar` that Maven Central requires. The DataWeave plugin's build goals
+       (compile/test/docs) are bound explicitly below, and a `-dw-library`-classified jar with
+       identical content is also attached for MuleSoft-convention consumers. The DataWeave module
+       resolves the same either way (the .dwl files live under slack/ on the classpath). -->
+  <packaging>jar</packaging>
 
   <name>DataWeave Slack Block Kit</name>
   <description>A DataWeave library of builder functions and types for composing Slack Block Kit
@@ -117,6 +122,9 @@
       </testResource>
     </testResources>
     <plugins>
+      <!-- DataWeave build goals bound explicitly (the dw-library lifecycle no longer applies
+           under jar packaging): validate/compile the modules, run the test suite, and generate
+           the API docs used for the javadoc jar. -->
       <plugin>
         <groupId>org.mule.weave</groupId>
         <artifactId>data-weave-maven-plugin</artifactId>
@@ -131,6 +139,82 @@
             <homePage>${project.basedir}/README.md</homePage>
           </docs>
         </configuration>
+        <executions>
+          <execution>
+            <id>dw-initialize</id>
+            <phase>initialize</phase>
+            <goals><goal>initialize</goal></goals>
+          </execution>
+          <execution>
+            <id>dw-compile</id>
+            <phase>compile</phase>
+            <goals><goal>compile</goal></goals>
+          </execution>
+          <execution>
+            <id>dw-test</id>
+            <phase>test</phase>
+            <goals><goal>test</goal></goals>
+          </execution>
+          <execution>
+            <id>dw-generate-docs</id>
+            <phase>prepare-package</phase>
+            <goals><goal>generate-docs</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Jars: the un-classified primary (Central's required artifact), a `-dw-library`
+           classifier jar with the same content (MuleSoft convention), plus the -sources and
+           -javadoc jars Central requires. All are built from the compiled DataWeave resources
+           / generated docs; desktop.ini (a Windows/Sync artifact) is excluded. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.1</version>
+        <executions>
+          <execution>
+            <id>default-jar</id>
+            <configuration>
+              <excludes>
+                <exclude>**/desktop.ini</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <id>dw-library-jar</id>
+            <phase>package</phase>
+            <goals><goal>jar</goal></goals>
+            <configuration>
+              <classifier>dw-library</classifier>
+              <excludes>
+                <exclude>**/desktop.ini</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <id>attach-sources</id>
+            <phase>package</phase>
+            <goals><goal>jar</goal></goals>
+            <configuration>
+              <classifier>sources</classifier>
+              <classesDirectory>${project.basedir}/src/main/dw</classesDirectory>
+              <excludes>
+                <exclude>**/desktop.ini</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <id>attach-javadoc</id>
+            <phase>package</phase>
+            <goals><goal>jar</goal></goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+              <classesDirectory>${project.build.directory}/data-weave-docs</classesDirectory>
+              <excludes>
+                <exclude>**/desktop.ini</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
@@ -148,84 +232,13 @@
   <profiles>
     <profile>
       <id>release</id>
+      <properties>
+        <!-- The central-publishing plugin (extensions=true) is the deploy handler; make sure the
+             default maven-deploy-plugin does not also run (it would want distributionManagement). -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+      </properties>
       <build>
         <plugins>
-          <!-- The dw-library packaging binds several Anypoint Exchange deploy goals to the
-               `deploy` phase (both from exchange-mule-maven-plugin and the DataWeave plugin
-               itself). We publish to Maven Central instead, so unbind all of them (phase none)
-               and let the central-publishing plugin handle deploy. -->
-          <plugin>
-            <groupId>org.mule.tools.maven</groupId>
-            <artifactId>exchange-mule-maven-plugin</artifactId>
-            <version>0.0.16</version>
-            <executions>
-              <execution>
-                <id>default-exchange-pre-deploy</id>
-                <phase>none</phase>
-              </execution>
-              <execution>
-                <id>default-exchange-deploy</id>
-                <phase>none</phase>
-              </execution>
-              <execution>
-                <id>default-exchange-post-deploy</id>
-                <phase>none</phase>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.mule.weave</groupId>
-            <artifactId>data-weave-maven-plugin</artifactId>
-            <version>${data.weave.maven.plugin.version}</version>
-            <executions>
-              <execution>
-                <id>default-deploy-docs</id>
-                <phase>none</phase>
-              </execution>
-              <execution>
-                <id>default-deploy</id>
-                <phase>none</phase>
-              </execution>
-            </executions>
-          </plugin>
-          <!-- Maven Central requires -sources and -javadoc jars. A dw-library has no Java
-               sources/javadoc, so we attach the DataWeave sources (the .dwl files) as the
-               sources jar and the generated DataWeave API docs as the javadoc jar. -->
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <version>3.4.1</version>
-            <executions>
-              <execution>
-                <id>attach-sources</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <classifier>sources</classifier>
-                  <classesDirectory>${project.basedir}/src/main/dw</classesDirectory>
-                  <excludes>
-                    <exclude>**/desktop.ini</exclude>
-                  </excludes>
-                </configuration>
-              </execution>
-              <execution>
-                <id>attach-javadoc</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <classifier>javadoc</classifier>
-                  <classesDirectory>${project.build.directory}/data-weave-docs</classesDirectory>
-                  <excludes>
-                    <exclude>**/desktop.ini</exclude>
-                  </excludes>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
